@@ -9,6 +9,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -35,7 +36,7 @@ class MusicPlayerService : MediaSessionService() {
     }
 
 
-    private fun createPlayer(context: Context, handleAutoFocus: Boolean = false): ExoPlayer {
+    private fun createPlayer(context: Context, isMainPlayer: Boolean = false): ExoPlayer {
 
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
@@ -43,7 +44,7 @@ class MusicPlayerService : MediaSessionService() {
             .build()
 
         return ExoPlayer.Builder(context)
-            .setAudioAttributes(audioAttributes, handleAutoFocus)
+            .setAudioAttributes(audioAttributes, isMainPlayer)
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
@@ -55,6 +56,7 @@ class MusicPlayerService : MediaSessionService() {
             val mediaItem = MediaItem.fromUri(it)  // Create a media item from URI
             player.setMediaItem(mediaItem)  // Add media item to player
             player.prepare()  // Prepare the player
+            player.repeatMode = Player.REPEAT_MODE_ONE
             playersBackground[it] = player  // Store the player in the map
         }
         Log.i(TAG, "addBackGroundMusics: ${playersBackground.keys}")
@@ -114,14 +116,15 @@ class MusicPlayerService : MediaSessionService() {
 
         val mainListener = object : Player.Listener {
 
+
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 super.onIsPlayingChanged(isPlaying)
                 playersBackground.map { if (isPlaying) it.value.play() else it.value.pause() }
             }
 
-            override fun onPlayerError(error: PlaybackException) {
-                super.onPlayerError(error)
-                playersBackground.map { it.value.pause() }
+            override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+                super.onPositionDiscontinuity(oldPosition, newPosition, reason)
+                Log.i(TAG, "onPositionDiscontinuity: newPo: ${newPosition.positionMs} oldPO: ${oldPosition.positionMs}")
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
@@ -129,26 +132,36 @@ class MusicPlayerService : MediaSessionService() {
                 when (playbackState) {
 
                     Player.STATE_BUFFERING -> {
-
+                        Log.i(TAG, "onIsPlayingChanged:BG_EVENT STATE_BUFFERING")
                     }
 
-                    Player.STATE_ENDED -> {
-
-                    }
+                    Player.STATE_ENDED -> {}
 
                     Player.STATE_IDLE -> {
-
+                        Log.i(TAG, "onIsPlayingChanged:BG_EVENT STATE_IDLE")
                     }
 
                     Player.STATE_READY -> {
-
+                        Log.i(TAG, "onIsPlayingChanged:BG_EVENT STATE_READY")
                     }
                 }
+            }
+
+            override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+                super.onTimelineChanged(timeline, reason)
+                if (!timeline.isEmpty) {
+                    val durationMs = timeline.getPeriod(0, Timeline.Period()).durationMs
+                    Log.i(TAG, "onTimelineChanged: $durationMs")
+                }
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                super.onPlayerError(error)
+                playersBackground.map { it.value.pause() }
             }
         }
 
         player.addListener(mainListener)
-
     }
 
 
@@ -171,7 +184,7 @@ class MusicPlayerService : MediaSessionService() {
                 super.onPlaybackStateChanged(playbackState)
                 when (playbackState) {
 
-                    Player.STATE_BUFFERING -> {
+                    /*Player.STATE_BUFFERING -> {
                         Log.i("MSessionService", "onIsPlayingChanged:BG_EVENT STATE_BUFFERING")
                     }
 
@@ -183,7 +196,7 @@ class MusicPlayerService : MediaSessionService() {
 
                     Player.STATE_READY -> {
                         Log.i("MSessionService", "onIsPlayingChanged:BG_EVENT STATE_READY")
-                    }
+                    }*/
                 }
             }
         }

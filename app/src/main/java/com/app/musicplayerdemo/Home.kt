@@ -11,6 +11,8 @@ import androidx.annotation.OptIn
 import androidx.fragment.app.Fragment
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.MetadataRetriever
+import androidx.media3.exoplayer.source.TrackGroupArray
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -18,6 +20,8 @@ import com.app.musicplayerdemo.adapters.MusicAdapter
 import com.app.musicplayerdemo.databinding.FragmentHomeBinding
 import com.app.musicplayerdemo.modal.Songs
 import com.app.musicplayerdemo.service.MusicPlayerService
+import com.google.common.util.concurrent.FutureCallback
+import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.MoreExecutors
 
 class Home : Fragment() {
@@ -47,7 +51,7 @@ class Home : Fragment() {
             intent.putStringArrayListExtra(
                 "MEDIA_URLS", arrayListOf(
                     "https://dev.iroidsolutions.com/kavana-meditation-backend/public/storage/content/background_music_file/z187m05zoNUhypGOeldqF6Jan33hK3wGCIgQCCdb.mp3",
-                    getString(R.string.audio_sample_1),
+//                    getString(R.string.audio_sample_1),
                 )
             )
 
@@ -64,10 +68,9 @@ class Home : Fragment() {
                     },
                     MoreExecutors.directExecutor()
                 )
-            }
+                            }
         }
     }
-
 
     override fun onPause() {
         super.onPause()
