@@ -54,7 +54,8 @@ class MainActivity : AppCompatActivity() {
         sessionToken = SessionToken(this, ComponentName(this, MusicPlayerService::class.java))
         factory = MediaController.Builder(this, sessionToken!!).buildAsync()
 
-        factory?.addListener({
+        factory?.addListener(
+            {
                 mediaController = factory?.let { if (it.isDone) it.get() else null }
                 binding.miniPlayer.player = mediaController
                 // Now handle UI updates with the media controller

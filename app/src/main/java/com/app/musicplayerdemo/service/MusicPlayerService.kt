@@ -13,6 +13,10 @@ import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import com.app.musicplayerdemo.utils.Constants.BG_MUSIC_VOL
+import com.app.musicplayerdemo.utils.Constants.MEDIA_URIS
+import com.app.musicplayerdemo.utils.Constants.MUTE_NON_PRIME_BG_MUSIC
+import com.app.musicplayerdemo.utils.Constants.PRIM_VOLUME
 
 const val TAG = "MSessionService"
 
@@ -28,49 +32,14 @@ class MusicPlayerService : MediaSessionService() {
         super.onCreate()
 
         player = createPlayer(this, true)
-//        playerNarrators = createPlayer(this)
-
+        //playerNarrators = createPlayer(this)
         // Configure media session for video playback as well
         mediaSession = MediaSession.Builder(this, player).build()
         synchronizedMainPlayers()
     }
 
-
-    private fun createPlayer(context: Context, isMainPlayer: Boolean = false): ExoPlayer {
-
-        val audioAttributes = AudioAttributes.Builder()
-            .setUsage(C.USAGE_MEDIA)
-            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-            .build()
-
-        return ExoPlayer.Builder(context)
-            .setAudioAttributes(audioAttributes, isMainPlayer)
-            .setHandleAudioBecomingNoisy(true)
-            .setWakeMode(C.WAKE_MODE_LOCAL)
-            .build()
-    }
-
-    private fun addBackGroundMusics(mediaUrls: List<String>) {
-        mediaUrls.map {
-            val player = createPlayer(this)  // Create a new player
-            val mediaItem = MediaItem.fromUri(it)  // Create a media item from URI
-            player.setMediaItem(mediaItem)  // Add media item to player
-            player.prepare()  // Prepare the player
-            player.repeatMode = Player.REPEAT_MODE_ONE
-            playersBackground[it] = player  // Store the player in the map
-        }
-        Log.i(TAG, "addBackGroundMusics: ${playersBackground.keys}")
-    }
-
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        intent?.let {
-            val mediaUrls = it.getStringArrayListExtra("MEDIA_URLS")
-            mediaUrls?.let { urls ->
-                cleanUpBgPlayers()
-                addBackGroundMusics(urls)
-                synchronizedBGPlayers()
-            }
-        }
+        intent?.let { handleIntents(it) }
         return super.onStartCommand(intent, flags, startId)
     }
 
@@ -107,15 +76,83 @@ class MusicPlayerService : MediaSessionService() {
         super.onDestroy()
     }
 
+
+    /**________________________METHODS_________________________________*/
+//volume controlling seek bar ( put in task tomorrow in task )
+//mute audio by index
+
+    private fun createPlayer(context: Context, isMainPlayer: Boolean = false): ExoPlayer {
+
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(C.USAGE_MEDIA)
+            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+            .build()
+
+        return ExoPlayer.Builder(context)
+            .setAudioAttributes(audioAttributes, isMainPlayer)
+            .setHandleAudioBecomingNoisy(true)
+            .setWakeMode(C.WAKE_MODE_LOCAL)
+            .build()
+    }
+
+    private fun addBackGroundMusics(mediaUrls: List<String>, muteItems: ArrayList<String>? = null) {
+        mediaUrls.map {
+            val player = createPlayer(this)  // Create a new player
+            val mediaItem = MediaItem.fromUri(it)  // Create a media item from URI
+            player.setMediaItem(mediaItem)  // Add media item to player
+            player.prepare()  // Prepare the player
+            player.repeatMode = Player.REPEAT_MODE_ONE
+            playersBackground[it] = player  // Store the player in the map
+        }
+
+        if (!muteItems.isNullOrEmpty()) {
+            muteItems.map { playersBackground[it]?.volume = 0f }
+        }
+
+        Log.i(TAG, "addBackGroundMusics: ${playersBackground.keys}")
+    }
+
+
+    private fun handleIntents(intent: Intent) {
+        when (intent.action) {
+            MEDIA_URIS -> {
+                val mediaUrls = intent.getStringArrayListExtra(MEDIA_URIS)
+                val muteAudioIndex = intent.getStringArrayListExtra(MUTE_NON_PRIME_BG_MUSIC)
+
+                mediaUrls?.let { urls ->
+                    cleanUpBgPlayers()
+                    addBackGroundMusics(urls, muteAudioIndex)
+                    synchronizedBGPlayers()
+                }
+                Log.d(TAG, "handleIntents: MEDIA_URIS")
+            }
+
+            PRIM_VOLUME -> {
+                val primeVolume = intent.getFloatExtra(PRIM_VOLUME, 1f)
+                player.volume = primeVolume
+//                playersBackground.map { it.value.volume = prime_volume }
+            }
+
+            BG_MUSIC_VOL -> {
+                val muteItems = intent.getStringArrayListExtra(MUTE_NON_PRIME_BG_MUSIC)
+                // TODO: PENDING FROM HERE
+            }
+
+
+            else -> {}
+        }
+    }
+
     private fun cleanUpBgPlayers() {
-        playersBackground.map { it.value.release() }
-        playersBackground.clear()
+        if (playersBackground.isNotEmpty()) {
+            playersBackground.map { it.value.release() }
+            playersBackground.clear()
+        }
     }
 
     private fun synchronizedMainPlayers() {
 
         val mainListener = object : Player.Listener {
-
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 super.onIsPlayingChanged(isPlaying)
@@ -123,8 +160,19 @@ class MusicPlayerService : MediaSessionService() {
             }
 
             override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+                // This event we are using to sync main and other player seek time line.
                 super.onPositionDiscontinuity(oldPosition, newPosition, reason)
-                Log.i(TAG, "onPositionDiscontinuity: newPo: ${newPosition.positionMs} oldPO: ${oldPosition.positionMs}")
+
+                val durationMs = player.contentDuration
+                if (durationMs > 0) {
+                    val percentPosition: Float = (newPosition.positionMs.toFloat() / durationMs) //0.5 but got trim to 0
+                    playersBackground.map {
+                        it.value.apply {
+                            val calPosition = (contentDuration * percentPosition).toLong()
+                            seekTo(calPosition)
+                        }
+                    }
+                }
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
@@ -132,17 +180,19 @@ class MusicPlayerService : MediaSessionService() {
                 when (playbackState) {
 
                     Player.STATE_BUFFERING -> {
-                        Log.i(TAG, "onIsPlayingChanged:BG_EVENT STATE_BUFFERING")
+                        Log.i(TAG, "onIsPlayingChanged: STATE_BUFFERING")
                     }
 
-                    Player.STATE_ENDED -> {}
+                    Player.STATE_ENDED -> {
+
+                    }
 
                     Player.STATE_IDLE -> {
-                        Log.i(TAG, "onIsPlayingChanged:BG_EVENT STATE_IDLE")
+                        Log.i(TAG, "onIsPlayingChanged:STATE_IDLE")
                     }
 
                     Player.STATE_READY -> {
-                        Log.i(TAG, "onIsPlayingChanged:BG_EVENT STATE_READY")
+                        Log.i(TAG, "onIsPlayingChanged: STATE_READY")
                     }
                 }
             }
@@ -154,6 +204,7 @@ class MusicPlayerService : MediaSessionService() {
                     Log.i(TAG, "onTimelineChanged: $durationMs")
                 }
             }
+
 
             override fun onPlayerError(error: PlaybackException) {
                 super.onPlayerError(error)
@@ -184,7 +235,7 @@ class MusicPlayerService : MediaSessionService() {
                 super.onPlaybackStateChanged(playbackState)
                 when (playbackState) {
 
-                    /*Player.STATE_BUFFERING -> {
+                    Player.STATE_BUFFERING -> {
                         Log.i("MSessionService", "onIsPlayingChanged:BG_EVENT STATE_BUFFERING")
                     }
 
@@ -196,13 +247,14 @@ class MusicPlayerService : MediaSessionService() {
 
                     Player.STATE_READY -> {
                         Log.i("MSessionService", "onIsPlayingChanged:BG_EVENT STATE_READY")
-                    }*/
+                    }
                 }
             }
         }
 
         playersBackground.forEach { it.value.addListener(bgListener) }
     }
+
 
 }
 

@@ -117,6 +117,4 @@
             android:minHeight="48dp"
             android:src="@drawable/next" />
     </LinearLayout>
-
-
 </androidx.constraintlayout.motion.widget.MotionLayout>

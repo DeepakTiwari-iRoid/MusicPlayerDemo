@@ -11,8 +11,6 @@ import androidx.annotation.OptIn
 import androidx.fragment.app.Fragment
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.MetadataRetriever
-import androidx.media3.exoplayer.source.TrackGroupArray
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -20,8 +18,8 @@ import com.app.musicplayerdemo.adapters.MusicAdapter
 import com.app.musicplayerdemo.databinding.FragmentHomeBinding
 import com.app.musicplayerdemo.modal.Songs
 import com.app.musicplayerdemo.service.MusicPlayerService
-import com.google.common.util.concurrent.FutureCallback
-import com.google.common.util.concurrent.Futures
+import com.app.musicplayerdemo.utils.Constants.MEDIA_URIS
+import com.app.musicplayerdemo.utils.Constants.MUTE_NON_PRIME_BG_MUSIC
 import com.google.common.util.concurrent.MoreExecutors
 
 class Home : Fragment() {
@@ -32,6 +30,7 @@ class Home : Fragment() {
     private val sessionToken by lazy { SessionToken(requireContext(), ComponentName(requireContext(), MusicPlayerService::class.java)) }
     private val mediaController by lazy { MediaController.Builder(requireContext(), sessionToken).buildAsync() }
 
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
@@ -39,7 +38,6 @@ class Home : Fragment() {
         // Inflate the layout for this fragment
         _binding = FragmentHomeBinding.inflate(layoutInflater)
         setup()
-        Log.d("TAG", "onCreateView: ")
         return binding.root
     }
 
@@ -48,12 +46,15 @@ class Home : Fragment() {
         with(binding) {
 
             val intent = Intent(requireContext(), MusicPlayerService::class.java)
+            intent.setAction(MEDIA_URIS)
             intent.putStringArrayListExtra(
-                "MEDIA_URLS", arrayListOf(
+                MEDIA_URIS, arrayListOf(
                     "https://dev.iroidsolutions.com/kavana-meditation-backend/public/storage/content/background_music_file/z187m05zoNUhypGOeldqF6Jan33hK3wGCIgQCCdb.mp3",
-//                    getString(R.string.audio_sample_1),
+                    getString(R.string.audio_sample_1),
                 )
             )
+
+            intent.putExtra(MUTE_NON_PRIME_BG_MUSIC, arrayListOf("https://github.com/rafaelreis-hotmart/Audio-Sample-files/raw/master/sample.mp3")) // pass url of which we want to mute audio
 
             rvMainMusic.layoutManager = LinearLayoutManager(requireContext(), LinearLayoutManager.VERTICAL, false)
             rvMainMusic.adapter = MusicAdapter(this@Home.requireContext(), songs()) { song ->
@@ -68,7 +69,7 @@ class Home : Fragment() {
                     },
                     MoreExecutors.directExecutor()
                 )
-                            }
+            }
         }
     }
 
