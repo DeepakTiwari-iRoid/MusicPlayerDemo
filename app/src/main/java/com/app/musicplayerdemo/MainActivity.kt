@@ -45,7 +45,6 @@ class MainActivity : AppCompatActivity() {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
-
     }
 
     override fun onStart() {
@@ -58,7 +57,6 @@ class MainActivity : AppCompatActivity() {
             {
                 mediaController = factory?.let { if (it.isDone) it.get() else null }
                 binding.miniPlayer.player = mediaController
-                // Now handle UI updates with the media controller
                 mediaController?.let { setupMiniPlayerControls(it) }
             },
             MoreExecutors.directExecutor()
@@ -73,6 +71,9 @@ class MainActivity : AppCompatActivity() {
                 miniplayer.miniMusicAuthor.text = artist
             }
         }
+
+        mediaController.hasNextMediaItem()
+
 
         // Play/Pause button
         binding.miniPlay.setOnClickListener {
@@ -101,7 +102,6 @@ class MainActivity : AppCompatActivity() {
         val navHostFragment = supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment
         navController = navHostFragment.navController
         binding.bottomNavigation.setupWithNavController(navController)
-
     }
 
     override fun onSupportNavigateUp(): Boolean {

@@ -13,10 +13,12 @@ import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
-import com.app.musicplayerdemo.utils.Constants.BG_MUSIC_VOL
+import com.app.musicplayerdemo.utils.Constants.BG_SOUND
+import com.app.musicplayerdemo.utils.Constants.BG_SOUND_INDEX
+import com.app.musicplayerdemo.utils.Constants.BG_SOUND_RANGE
 import com.app.musicplayerdemo.utils.Constants.MEDIA_URIS
-import com.app.musicplayerdemo.utils.Constants.MUTE_NON_PRIME_BG_MUSIC
 import com.app.musicplayerdemo.utils.Constants.PRIM_VOLUME
+import com.app.musicplayerdemo.utils.Constants.REPEAT_ALL
 
 const val TAG = "MSessionService"
 
@@ -24,16 +26,15 @@ class MusicPlayerService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
     private lateinit var player: ExoPlayer
-
-    //    private lateinit var playerNarrators: ExoPlayer
     private val playersBackground: MutableMap<String, ExoPlayer> = mutableMapOf()
 
     override fun onCreate() {
         super.onCreate()
 
         player = createPlayer(this, true)
-        //playerNarrators = createPlayer(this)
-        // Configure media session for video playback as well
+        player.repeatMode = Player.REPEAT_MODE_ONE
+        player.playWhenReady = true
+
         mediaSession = MediaSession.Builder(this, player).build()
         synchronizedMainPlayers()
     }
@@ -78,8 +79,6 @@ class MusicPlayerService : MediaSessionService() {
 
 
     /**________________________METHODS_________________________________*/
-//volume controlling seek bar ( put in task tomorrow in task )
-//mute audio by index
 
     private fun createPlayer(context: Context, isMainPlayer: Boolean = false): ExoPlayer {
 
@@ -95,7 +94,7 @@ class MusicPlayerService : MediaSessionService() {
             .build()
     }
 
-    private fun addBackGroundMusics(mediaUrls: List<String>, muteItems: ArrayList<String>? = null) {
+    private fun addBackGroundMusics(mediaUrls: List<String>) {
         mediaUrls.map {
             val player = createPlayer(this)  // Create a new player
             val mediaItem = MediaItem.fromUri(it)  // Create a media item from URI
@@ -104,24 +103,19 @@ class MusicPlayerService : MediaSessionService() {
             player.repeatMode = Player.REPEAT_MODE_ONE
             playersBackground[it] = player  // Store the player in the map
         }
-
-        if (!muteItems.isNullOrEmpty()) {
-            muteItems.map { playersBackground[it]?.volume = 0f }
-        }
-
-        Log.i(TAG, "addBackGroundMusics: ${playersBackground.keys}")
     }
 
-
     private fun handleIntents(intent: Intent) {
+
         when (intent.action) {
+
             MEDIA_URIS -> {
+
                 val mediaUrls = intent.getStringArrayListExtra(MEDIA_URIS)
-                val muteAudioIndex = intent.getStringArrayListExtra(MUTE_NON_PRIME_BG_MUSIC)
 
                 mediaUrls?.let { urls ->
                     cleanUpBgPlayers()
-                    addBackGroundMusics(urls, muteAudioIndex)
+                    addBackGroundMusics(urls)
                     synchronizedBGPlayers()
                 }
                 Log.d(TAG, "handleIntents: MEDIA_URIS")
@@ -130,14 +124,17 @@ class MusicPlayerService : MediaSessionService() {
             PRIM_VOLUME -> {
                 val primeVolume = intent.getFloatExtra(PRIM_VOLUME, 1f)
                 player.volume = primeVolume
-//                playersBackground.map { it.value.volume = prime_volume }
             }
 
-            BG_MUSIC_VOL -> {
-                val muteItems = intent.getStringArrayListExtra(MUTE_NON_PRIME_BG_MUSIC)
-                // TODO: PENDING FROM HERE
+            BG_SOUND -> {
+                val itemKey = intent.getStringExtra(BG_SOUND_INDEX)
+                val itemVolume = intent.getFloatExtra(BG_SOUND_RANGE, 0f)
+                playersBackground[itemKey]?.volume = itemVolume
             }
 
+            REPEAT_ALL -> {
+                player.repeatMode = Player.REPEAT_MODE_ONE
+            }
 
             else -> {}
         }
@@ -157,6 +154,11 @@ class MusicPlayerService : MediaSessionService() {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 super.onIsPlayingChanged(isPlaying)
                 playersBackground.map { if (isPlaying) it.value.play() else it.value.pause() }
+                /*             if (isPlaying) {
+                                 playAllPlayers()
+                             }*/
+
+                Log.d(TAG, "onIsPlayingChanged: $isPlaying")
             }
 
             override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
@@ -170,8 +172,17 @@ class MusicPlayerService : MediaSessionService() {
                         it.value.apply {
                             val calPosition = (contentDuration * percentPosition).toLong()
                             seekTo(calPosition)
+                            Log.d(TAG, "onPositionDiscontinuity: $calPosition/ ${it.value.contentDuration}")
                         }
                     }
+                }
+            }
+
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                super.onPlayWhenReadyChanged(playWhenReady, reason)
+                Log.d(TAG, "onPlayWhenReadyChanged: $playWhenReady")
+                if (!playWhenReady) {
+                    pauseAllPlayers() // Pause all players when main player is paused
                 }
             }
 
@@ -180,7 +191,8 @@ class MusicPlayerService : MediaSessionService() {
                 when (playbackState) {
 
                     Player.STATE_BUFFERING -> {
-                        Log.i(TAG, "onIsPlayingChanged: STATE_BUFFERING")
+                        Log.d(TAG, "onIsPlayingChanged: STATE_BUFFERING")
+                        rePreparePlayersIfNecessary()
                     }
 
                     Player.STATE_ENDED -> {
@@ -188,11 +200,14 @@ class MusicPlayerService : MediaSessionService() {
                     }
 
                     Player.STATE_IDLE -> {
-                        Log.i(TAG, "onIsPlayingChanged:STATE_IDLE")
+                        Log.d(TAG, "onIsPlayingChanged:STATE_IDLE")
                     }
 
                     Player.STATE_READY -> {
-                        Log.i(TAG, "onIsPlayingChanged: STATE_READY")
+                        if (playersBackground.all { it.value.playbackState == Player.STATE_READY }) {
+                            playAllPlayers()
+                        }
+                        Log.d(TAG, "onPlaybackStateChanged: STATE_READY")
                     }
                 }
             }
@@ -201,19 +216,20 @@ class MusicPlayerService : MediaSessionService() {
                 super.onTimelineChanged(timeline, reason)
                 if (!timeline.isEmpty) {
                     val durationMs = timeline.getPeriod(0, Timeline.Period()).durationMs
-                    Log.i(TAG, "onTimelineChanged: $durationMs")
+                    Log.d(TAG, "onTimelineChanged: $durationMs")
                 }
             }
 
-
             override fun onPlayerError(error: PlaybackException) {
                 super.onPlayerError(error)
-                playersBackground.map { it.value.pause() }
+                pauseAllPlayers()
             }
         }
 
         player.addListener(mainListener)
     }
+
+    /*-------------*/
 
 
     private fun synchronizedBGPlayers() {
@@ -222,13 +238,23 @@ class MusicPlayerService : MediaSessionService() {
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 super.onIsPlayingChanged(isPlaying)
-                if (isPlaying) player.play() else player.pause()
-                Log.d("MSessionService", "onIsPlayingChanged:BG_EVENT $isPlaying ")
+                if (!isPlaying) {
+                    player.pause()
+                }
+                Log.i("MSessionService", "onIsPlayingChanged:BG_EVENT $isPlaying ")
+            }
+
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                super.onPlayWhenReadyChanged(playWhenReady, reason)
+                Log.i(TAG, "onPlayWhenReadyChanged: $playWhenReady")
+                if (!playWhenReady && player.isPlaying) {
+                    player.pause() // Pause main player if any other player pauses
+                }
             }
 
             override fun onPlayerError(error: PlaybackException) {
                 super.onPlayerError(error)
-                player.pause()
+                pauseAllPlayers()
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
@@ -241,20 +267,51 @@ class MusicPlayerService : MediaSessionService() {
 
                     Player.STATE_ENDED -> {}
 
-                    Player.STATE_IDLE -> {
-                        Log.i("MSessionService", "onIsPlayingChanged:BG_EVENT STATE_IDLE")
-                    }
+                    Player.STATE_IDLE -> {}
 
                     Player.STATE_READY -> {
                         Log.i("MSessionService", "onIsPlayingChanged:BG_EVENT STATE_READY")
+                        if (playersBackground.all { it.value.playbackState == Player.STATE_READY }) {
+                            playAllPlayers()
+                        }
                     }
                 }
             }
         }
-
         playersBackground.forEach { it.value.addListener(bgListener) }
     }
 
 
+    // Function to play all players
+    fun playAllPlayers() {
+        if (player.playbackState == Player.STATE_READY) {
+            playersBackground.forEach { players ->
+                if (players.value.playbackState == Player.STATE_READY) {
+                    players.value.play()
+                    Log.d(TAG, "playAllPlayers: isREADY")
+                } else {
+                    Log.e(TAG, "playAllPlayers: isNOTREADY")
+                }
+            }
+            player.play()
+        }
+    }
+
+    // Function to pause all players
+    fun pauseAllPlayers() {
+        player.pause()
+        playersBackground.forEach { player ->
+            player.value.pause()
+        }
+    }
+
+    fun rePreparePlayersIfNecessary() {
+        playersBackground.forEach { map ->
+            val player = map.value
+            if (player.playbackState != Player.STATE_READY && player.playbackState != Player.STATE_BUFFERING) {
+                player.prepare()  // Reprepare player to ensure media is ready
+            }
+        }
+    }
 }
 

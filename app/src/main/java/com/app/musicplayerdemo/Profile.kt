@@ -1,8 +1,6 @@
 package com.app.musicplayerdemo
 
 import android.content.ComponentName
-import android.content.Context
-import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -10,13 +8,15 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.SeekBar
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.app.musicplayerdemo.databinding.FragmentProfileBinding
 import com.app.musicplayerdemo.service.MusicPlayerService
-import com.app.musicplayerdemo.utils.Constants.BG_MUSIC_VOL
-import com.app.musicplayerdemo.utils.Constants.MUTE_NON_PRIME_BG_MUSIC
-import com.app.musicplayerdemo.utils.Constants.PRIM_VOLUME
+import com.app.musicplayerdemo.utils.Constants
+import com.app.musicplayerdemo.utils.Constants.bgMusicTrackController
+import com.app.musicplayerdemo.utils.Constants.primeVolumeController
+import kotlinx.coroutines.Job
 
 class Profile : Fragment() {
 
@@ -26,7 +26,8 @@ class Profile : Fragment() {
 
     private var _binding: FragmentProfileBinding? = null
     private val binding get() = _binding!!
-
+    private var job: Job? = null
+    val deb = Constants.Debouncer()
 
     private val sessionToken by lazy { SessionToken(requireContext(), ComponentName(requireContext(), MusicPlayerService::class.java)) }
     private val mediaController by lazy { MediaController.Builder(requireContext(), sessionToken).buildAsync() }
@@ -44,57 +45,50 @@ class Profile : Fragment() {
 
     private fun setup() {
         with(binding) {
+            val itemKey = requireContext().getString(R.string.audio_sample_1)
 
             seekBarPrimary.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                    Log.i(TAG, "onProgressChanged: seek $seekBar, progress $progress, fromUser $fromUser")
-
+                    seekBar?.let {
+                        deb.debounce(lifecycleScope) {
+                            Log.d(TAG, "onProgressChanged: PRIMARY DELAY $progress")
+                            primeVolumeController(requireContext(), (seekBar.progress).div(100f))
+                        }
+                    }
                 }
 
                 override fun onStartTrackingTouch(seekBar: SeekBar?) {
                     Log.i(TAG, "onStartTrackingTouch: ${seekBar?.progress}")
+                    seekBarSecondary.progress = 0
                 }
 
                 override fun onStopTrackingTouch(seekBar: SeekBar?) {
-                    seekBar?.let {
+                    Log.i(TAG, "onStopTrackingTouch: ${seekBar?.progress}")
+                    /*seekBar?.let {
                         primeVolumeController(requireContext(), (seekBar.progress).div(100f))
-                    }
+                    }*/
                 }
             })
+
 
             seekBarSecondary.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                     Log.i(TAG, "onProgressChanged: seek $seekBar, progress $progress, fromUser $fromUser")
-
                 }
 
                 override fun onStartTrackingTouch(seekBar: SeekBar?) {
                     Log.i(TAG, "onStartTrackingTouch: ${seekBar?.progress}")
+                    seekBarPrimary.progress = 0
                 }
 
                 override fun onStopTrackingTouch(seekBar: SeekBar?) {
                     seekBar?.let {
-                        primeVolumeController(requireContext(), (seekBar.progress).div(100f))
+                        bgMusicTrackController(requireContext(), itemKey, seekBar.progress.div(100f))
                     }
                 }
             })
-
-
         }
-    }
 
-    fun primeVolumeController(context: Context, volume: Float) {
-        val intent = Intent(context, MusicPlayerService::class.java)
-        intent.setAction(PRIM_VOLUME)
-        intent.putExtra(PRIM_VOLUME, volume)
-        context.startService(intent)
-    }
-
-    fun bgMusicTrackController(context: Context, muteItems: ArrayList<String>) {
-        val intent = Intent(context, MusicPlayerService::class.java)
-        intent.setAction(BG_MUSIC_VOL)
-        intent.putExtra(MUTE_NON_PRIME_BG_MUSIC, muteItems)
-        context.startService(intent)
     }
 
     override fun onDestroy() {
@@ -104,3 +98,5 @@ class Profile : Fragment() {
 
 
 }
+
+
