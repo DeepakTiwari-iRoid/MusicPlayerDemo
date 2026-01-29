@@ -21,14 +21,22 @@ import com.app.musicplayerdemo.service.MusicPlayerService
 import com.app.musicplayerdemo.utils.Constants.MEDIA_URIS
 import com.app.musicplayerdemo.utils.Constants.mediaItem
 import com.google.common.util.concurrent.MoreExecutors
+import kotlin.random.Random
 
 class Home : Fragment() {
 
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
 
-    private val sessionToken by lazy { SessionToken(requireContext(), ComponentName(requireContext(), MusicPlayerService::class.java)) }
-    private val mediaController by lazy { MediaController.Builder(requireContext(), sessionToken).buildAsync() }
+    private val sessionToken by lazy {
+        SessionToken(
+            requireContext(),
+            ComponentName(requireContext(), MusicPlayerService::class.java)
+        )
+    }
+    private val mediaController by lazy {
+        MediaController.Builder(requireContext(), sessionToken).buildAsync()
+    }
 
 
     override fun onCreateView(
@@ -50,21 +58,48 @@ class Home : Fragment() {
             intent.setAction(MEDIA_URIS)
 
             intent.putStringArrayListExtra(
-                MEDIA_URIS, arrayListOf(
+                MEDIA_URIS,
+                arrayListOf(
                     "https://dev.iroidsolutions.com/kavana-meditation-backend/public/storage/content/background_music_file/z187m05zoNUhypGOeldqF6Jan33hK3wGCIgQCCdb.mp3",
                     getString(R.string.audio_sample_1),
                 )
             )
 
-            rvMainMusic.layoutManager = LinearLayoutManager(requireContext(), LinearLayoutManager.VERTICAL, false)
+            rvMainMusic.layoutManager =
+                LinearLayoutManager(requireContext(), LinearLayoutManager.VERTICAL, false)
             rvMainMusic.adapter = MusicAdapter(this@Home.requireContext(), songs()) { song ->
 
                 val uid = System.currentTimeMillis()
 
                 mediaController.addListener(
                     {
-                        val mediaController = if (mediaController.isDone) mediaController.get() else null
-                        mediaController?.setMediaItems(listOf(mediaItem(song.url, MetaData(title = "$uid")), mediaItem(song.url, MetaData(title = "2+$uid+2"))))
+                        val mediaController =
+                            if (mediaController.isDone) mediaController.get() else null
+                        mediaController?.setMediaItems(
+                            listOf(
+                                mediaItem(
+                                    song.url, MetaData(
+                                        title = "1+$uid+1",
+                                        thumbnail = "https://picsum.photos/200/300?random=${
+                                            Random.nextInt(
+                                                0,
+                                                100
+                                            )
+                                        }"
+                                    )
+                                ), mediaItem(
+                                    song.url, MetaData(
+                                        title = "2+$uid+2",
+                                        thumbnail = "https://picsum.photos/200/300?random=${
+                                            Random.nextInt(
+                                                0,
+                                                100
+                                            )
+                                        }"
+                                    )
+                                )
+                            )
+                        )
                         mediaController?.prepare()
                         mediaController?.play()
                         requireContext().startService(intent)
@@ -94,10 +129,26 @@ class Home : Fragment() {
 
     private fun songs(): ArrayList<Songs> {
         return arrayListOf(
-            Songs(title = "Test Title", author = "Test Author", url = getString(R.string.media_url_mp4)),
-            Songs(title = "Test Title1", author = "Test Author1", url = getString(R.string.media_url_mp4)),
-            Songs(title = "Test Title2", author = "Test Author2", url = getString(R.string.media_url_mp4)),
-            Songs(title = "Test Title3", author = "Test Author3", url = getString(R.string.media_url_mp4)),
+            Songs(
+                title = "Test Title",
+                author = "Test Author",
+                url = getString(R.string.media_url_mp4)
+            ),
+            Songs(
+                title = "Test Title1",
+                author = "Test Author1",
+                url = getString(R.string.media_url_mp4)
+            ),
+            Songs(
+                title = "Test Title2",
+                author = "Test Author2",
+                url = getString(R.string.media_url_mp4)
+            ),
+            Songs(
+                title = "Test Title3",
+                author = "Test Author3",
+                url = getString(R.string.media_url_mp4)
+            ),
         )
     }
 

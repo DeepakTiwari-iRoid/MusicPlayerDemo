@@ -10,9 +10,11 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.ui.PlayerNotificationManager
 import com.app.musicplayerdemo.utils.Constants.BG_SOUND
 import com.app.musicplayerdemo.utils.Constants.BG_SOUND_INDEX
 import com.app.musicplayerdemo.utils.Constants.BG_SOUND_RANGE
@@ -27,6 +29,10 @@ class MusicPlayerService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
     private lateinit var player: ExoPlayer
     private val playersBackground: MutableMap<String, ExoPlayer> = mutableMapOf()
+
+    @UnstableApi
+    private lateinit var notificationManager: PlayerNotificationManager
+
 
     override fun onCreate() {
         super.onCreate()
@@ -161,18 +167,26 @@ class MusicPlayerService : MediaSessionService() {
                 Log.d(TAG, "onIsPlayingChanged: $isPlaying")
             }
 
-            override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int
+            ) {
                 // This event we are using to sync main and other player seek time line.
                 super.onPositionDiscontinuity(oldPosition, newPosition, reason)
 
                 val durationMs = player.contentDuration
                 if (durationMs > 0) {
-                    val percentPosition: Float = (newPosition.positionMs.toFloat() / durationMs) //0.5 but got trim to 0
+                    val percentPosition: Float =
+                        (newPosition.positionMs.toFloat() / durationMs) //0.5 but got trim to 0
                     playersBackground.map {
                         it.value.apply {
                             val calPosition = (contentDuration * percentPosition).toLong()
                             seekTo(calPosition)
-                            Log.d(TAG, "onPositionDiscontinuity: $calPosition/ ${it.value.contentDuration}")
+                            Log.d(
+                                TAG,
+                                "onPositionDiscontinuity: $calPosition/ ${it.value.contentDuration}"
+                            )
                         }
                     }
                 }
@@ -314,4 +328,3 @@ class MusicPlayerService : MediaSessionService() {
         }
     }
 }
-

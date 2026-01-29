@@ -2,6 +2,7 @@ package com.app.musicplayerdemo.utils
 
 import android.content.Context
 import android.content.Intent
+import androidx.core.net.toUri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import com.app.musicplayerdemo.modal.MetaData
@@ -50,6 +51,7 @@ object Constants {
 
     private fun metaData(meta: MetaData): MediaMetadata {
         return MediaMetadata.Builder()
+            .setArtworkUri(meta.thumbnail?.toUri())
             .setArtist(meta.artist)
             .setTitle(meta.title)
             .setDescription(meta.description)

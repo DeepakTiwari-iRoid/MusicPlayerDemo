@@ -8,5 +8,6 @@ data class MetaData(
     val subTitle:String? = null,
     val description:String? = null,
     val displayTitle:String? = null,
+    val thumbnail:String? = null
 )
 
