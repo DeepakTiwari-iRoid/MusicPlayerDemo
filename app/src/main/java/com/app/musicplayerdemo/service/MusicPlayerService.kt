@@ -14,7 +14,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
-import androidx.media3.ui.PlayerNotificationManager
+import com.app.musicplayerdemo.service.PlayerUtils.CustomMediaNotificationProvider
 import com.app.musicplayerdemo.utils.Constants.BG_SOUND
 import com.app.musicplayerdemo.utils.Constants.BG_SOUND_INDEX
 import com.app.musicplayerdemo.utils.Constants.BG_SOUND_RANGE
@@ -24,25 +24,30 @@ import com.app.musicplayerdemo.utils.Constants.REPEAT_ALL
 
 const val TAG = "MSessionService"
 
+@UnstableApi
 class MusicPlayerService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
     private lateinit var player: ExoPlayer
     private val playersBackground: MutableMap<String, ExoPlayer> = mutableMapOf()
 
-    @UnstableApi
-    private lateinit var notificationManager: PlayerNotificationManager
-
+    private lateinit var customMediaNotificationProvider: CustomMediaNotificationProvider
 
     override fun onCreate() {
         super.onCreate()
+        customMediaNotificationProvider = CustomMediaNotificationProvider(this)
 
         player = createPlayer(this, true)
         player.repeatMode = Player.REPEAT_MODE_ONE
         player.playWhenReady = true
 
-        mediaSession = MediaSession.Builder(this, player).build()
+        mediaSession = MediaSession
+            .Builder(this, player)
+            .setCallback(PlayerUtils.HandleMediaSessionCallback())
+            .build()
+
         synchronizedMainPlayers()
+        setMediaNotificationProvider(customMediaNotificationProvider)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -50,9 +55,8 @@ class MusicPlayerService : MediaSessionService() {
         return super.onStartCommand(intent, flags, startId)
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
-        return mediaSession
-    }
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =
+        mediaSession
 
     // The user dismissed the app from the recent tasks
     override fun onTaskRemoved(rootIntent: Intent?) {

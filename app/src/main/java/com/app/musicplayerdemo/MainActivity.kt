@@ -4,12 +4,14 @@ import android.content.ComponentName
 import android.os.Bundle
 import android.view.View
 import androidx.activity.enableEdgeToEdge
+import androidx.annotation.OptIn
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import androidx.navigation.NavController
@@ -47,6 +49,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    @OptIn(UnstableApi::class)
     override fun onStart() {
         super.onStart()
 
